@@ -1,0 +1,62 @@
+﻿@{ Layout = null; }
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign In - Secure Assistant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-[#343541] h-screen flex items-center justify-center font-sans px-4">
+
+    <div class="max-w-md w-full bg-[#202123] border border-gray-700/60 rounded-xl p-8 shadow-2xl">
+        <div class="text-center mb-8">
+            <h2 class="text-3xl font-extrabold text-white tracking-tight">Welcome Back</h2>
+            <p class="text-sm text-gray-400 mt-2">Log in to your secure account</p>
+        </div>
+
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="bg-green-500/10 border border-green-500/30 text-green-400 text-sm py-3 px-4 rounded-lg mb-4">
+                @TempData["SuccessMessage"]
+            </div>
+        }
+
+        @using (Html.BeginForm("Login", "Account", FormMethod.Post, new { @class = "space-y-5" }))
+        {
+            @Html.AntiForgeryToken()
+
+            <div>
+                <label class="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Username</label>
+                <input type="text" name="username" required autocomplete="off"
+                       placeholder="Enter your username"
+                       class="w-full bg-[#40414f] border border-gray-600 rounded-lg py-3 px-4 text-base text-white placeholder-gray-500 outline-none focus:border-[#10a37f] transition duration-200" />
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Password</label>
+                <input type="password" name="password" required
+                       placeholder="Enter your password"
+                       class="w-full bg-[#40414f] border border-gray-600 rounded-lg py-3 px-4 text-base text-white placeholder-gray-500 outline-none focus:border-[#10a37f] transition duration-200" />
+            </div>
+
+            if (ViewBag.Error != null)
+            {
+                <div class="bg-red-500/10 border border-red-500/30 text-red-400 text-sm py-3 px-4 rounded-lg">
+                    @ViewBag.Error
+                </div>
+            }
+
+            <button type="submit" class="w-full bg-[#10a37f] hover:bg-[#1a7f64] text-white font-semibold py-3.5 rounded-lg transition duration-200 shadow-lg tracking-wide cursor-pointer text-base">
+                Sign In
+            </button>
+        }
+
+        <div class="text-center mt-6 border-t border-gray-700 pt-5">
+            <span class="text-sm text-gray-400">Don't have an account?</span>
+            <a href="@Url.Action("Register", "Account")" class="text-sm font-semibold text-[#10a37f] hover:text-[#1a7f64] ml-1 transition">Sign up</a>
+        </div>
+    </div>
+
+</body>
+</html>

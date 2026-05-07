@@ -1,0 +1,561 @@
+﻿@{
+    ViewBag.Title = "AI Chatbot Assistant";
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Chatbot Assistant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        /* Chat Thread - Messages ka group */
+        .chat-thread {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 20px 0;
+        }
+
+        /* Individual Message Row */
+        .message-row {
+            display: flex;
+            padding: 2px 16px;
+            animation: fadeIn 0.3s ease;
+        }
+
+            /* User Message - Right Side (WhatsApp Style) */
+            .message-row.user {
+                justify-content: flex-end;
+            }
+
+            /* Bot Message - Left Side (WhatsApp Style) */
+            .message-row.bot {
+                justify-content: flex-start;
+            }
+
+            /* Error Message - Center */
+            .message-row.error {
+                justify-content: center;
+            }
+
+        /* Message Bubble */
+        .message-bubble {
+            max-width: 70%;
+            padding: 10px 16px;
+            border-radius: 18px;
+            font-size: 14px;
+            line-height: 1.5;
+            word-wrap: break-word;
+            position: relative;
+        }
+
+        /* User Bubble - Green (WhatsApp Style) */
+        .message-row.user .message-bubble {
+            background: #005c4b;
+            color: #e9edef;
+            border-top-right-radius: 4px;
+        }
+
+        /* Bot Bubble - Dark Grey */
+        .message-row.bot .message-bubble {
+            background: #202c33;
+            color: #e9edef;
+            border-top-left-radius: 4px;
+        }
+
+        /* Error Bubble */
+        .message-row.error .message-bubble {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #fca5a5;
+            border-radius: 12px;
+            font-size: 13px;
+        }
+
+        /* Timestamp */
+        .message-time {
+            font-size: 11px;
+            color: #667781;
+            text-align: right;
+            margin-top: 4px;
+        }
+
+        .message-row.user .message-time {
+            color: #8696a0;
+        }
+
+        /* Date Separator */
+        .date-separator {
+            text-align: center;
+            padding: 8px 0;
+        }
+
+            .date-separator span {
+                background: #182229;
+                color: #8696a0;
+                font-size: 12px;
+                padding: 6px 12px;
+                border-radius: 8px;
+            }
+
+        /* Scrollbar */
+        .sidebar-scroll::-webkit-scrollbar,
+        .chat-scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .sidebar-scroll::-webkit-scrollbar-thumb,
+        .chat-scroll::-webkit-scrollbar-thumb {
+            background: #374045;
+            border-radius: 3px;
+        }
+
+        /* Progress Bar */
+        .progress-bar {
+            transition: width 0.5s ease;
+        }
+
+        /* Typing Indicator */
+        .typing-indicator {
+            display: flex;
+            gap: 4px;
+            padding: 8px 12px;
+        }
+
+            .typing-indicator span {
+                width: 8px;
+                height: 8px;
+                background: #667781;
+                border-radius: 50%;
+                animation: typingBounce 1.4s infinite;
+            }
+
+                .typing-indicator span:nth-child(2) {
+                    animation-delay: 0.2s;
+                }
+
+                .typing-indicator span:nth-child(3) {
+                    animation-delay: 0.4s;
+                }
+
+        @@keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @@keyframes typingBounce {
+            0%, 60%, 100% {
+                opacity: 0.3;
+                transform: translateY(0);
+            }
+
+            30% {
+                opacity: 1;
+                transform: translateY(-5px);
+            }
+        }
+    </style>
+</head>
+<body class="bg-[#111b21] h-screen flex font-sans">
+
+    <!-- ==================== SIDEBAR ==================== -->
+    <div class="w-80 bg-[#111b21] flex flex-col h-screen flex-shrink-0 border-r border-[#222d34]">
+        <!-- Header -->
+        <div class="p-4 bg-[#202c33] flex justify-between items-center">
+            <h2 class="text-white font-semibold text-lg">Chats</h2>
+            <div class="flex gap-3">
+                <button onclick="newChat()" title="New Chat"
+                        class="text-gray-300 hover:text-white transition text-xl">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 5v14M5 12h14" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Chat History (Threads) -->
+        <div id="historyList" class="flex-1 overflow-y-auto sidebar-scroll">
+            <p class="text-[#8696a0] text-sm text-center mt-8">No conversations yet</p>
+        </div>
+
+        <!-- User Info & Quota -->
+        <div class="bg-[#202c33] p-4">
+            <!-- Quota Bar -->
+            <div class="mb-3">
+                <div class="flex justify-between items-center mb-1.5">
+                    <span class="text-[#8696a0] text-xs">.</span>
+                    <span id="quotaText" class="text-[#8696a0] text-xs">Loading...</span>
+                </div>
+                <div class="w-full bg-[#111b21] rounded-full h-1.5">
+                    <div id="quotaBar" class="progress-bar bg-[#00a884] h-1.5 rounded-full" style="width: 100%"></div>
+                </div>
+            </div>
+
+            <!-- User Info -->
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full bg-[#00a884] flex items-center justify-center">
+                        <span id="userInitial" class="text-white font-semibold">U</span>
+                    </div>
+                    <div>
+                        <div id="usernameDisplay" class="text-white text-sm">User</div>
+                        <div class="text-[#8696a0] text-xs">Online</div>
+                    </div>
+                </div>
+                <a href="@Url.Action("Logout", "Account")"
+                   class="text-[#8696a0] hover:text-red-400 transition">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" />
+                    </svg>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== MAIN CHAT AREA ==================== -->
+    <div class="flex-1 flex flex-col min-w-0">
+
+        <!-- Chat Header -->
+        <div class="bg-[#202c33] px-6 py-3 flex items-center gap-4 border-b border-[#222d34]">
+            <div class="w-10 h-10 rounded-full bg-[#00a884] flex items-center justify-center">
+                <span class="text-white text-lg">🤖</span>
+            </div>
+            <div>
+                <h3 class="text-white font-semibold">Simple Chatbot</h3>
+                <p class="text-[#8696a0] text-xs">Simple Chatbot</p>
+            </div>
+        </div>
+
+        <!-- Background Pattern (WhatsApp Style) -->
+        <div class="flex-1 overflow-y-auto chat-scroll" style="background-color: #0b141a; background-image: url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22400%22 height=%22400%22><circle cx=%22200%22 cy=%22200%22 r=%22180%22 fill=%22none%22 stroke=%22%2318232d%22 stroke-width=%222%22 opacity=%220.3%22/><circle cx=%22200%22 cy=%22200%22 r=%22120%22 fill=%22none%22 stroke=%22%2318232d%22 stroke-width=%222%22 opacity=%220.3%22/><circle cx=%22200%22 cy=%22200%22 r=%2260%22 fill=%22none%22 stroke=%22%2318232d%22 stroke-width=%222%22 opacity=%220.3%22/></svg>');">
+
+            <!-- Messages Container -->
+            <div id="chatMessages" class="max-w-4xl mx-auto">
+                <div class="flex flex-col items-center justify-center h-full text-center px-6" style="min-height: calc(100vh - 120px);">
+                    <div class="w-20 h-20 rounded-full bg-[#202c33] flex items-center justify-center mb-6">
+                        <span class="text-4xl">🤖</span>
+                    </div>
+                    <h1 class="text-[#e9edef] text-2xl font-light mb-3">Chatbot</h1>
+                    <p class="text-[#8696a0] max-w-md text-sm">
+                        Ask me anything! Capitals, science, history, geography - I'm here to help.
+                    </p>
+                    <div class="mt-8 flex flex-wrap gap-2 justify-center max-w-md">
+                        <button onclick="quickAsk('What is the capital of France?')"
+                                class="text-[#e9edef] bg-[#202c33] hover:bg-[#2a3942] rounded-full py-2 px-4 text-sm transition">
+                            🇫🇷 Capital of France?
+                        </button>
+                        <button onclick="quickAsk('Who discovered gravity?')"
+                                class="text-[#e9edef] bg-[#202c33] hover:bg-[#2a3942] rounded-full py-2 px-4 text-sm transition">
+                            🍎 Who discovered gravity?
+                        </button>
+                        <button onclick="quickAsk('What is the largest planet?')"
+                                class="text-[#e9edef] bg-[#202c33] hover:bg-[#2a3942] rounded-full py-2 px-4 text-sm transition">
+                            🪐 Largest planet?
+                        </button>
+                        <button onclick="quickAsk('How many continents are there?')"
+                                class="text-[#e9edef] bg-[#202c33] hover:bg-[#2a3942] rounded-full py-2 px-4 text-sm transition">
+                            🌍 How many continents?
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="bg-[#202c33] px-4 py-3">
+            <div class="max-w-4xl mx-auto flex gap-3 items-center">
+                <div class="flex-1 bg-[#2a3942] rounded-lg flex items-center">
+                    <input type="text" id="questionInput" placeholder="Type a message..."
+                           class="flex-1 bg-transparent py-3 px-4 text-[#e9edef] placeholder-[#8696a0] outline-none text-sm" />
+                </div>
+                <button id="sendBtn" onclick="sendMessage()"
+                        class="text-[#8696a0] hover:text-white transition disabled:opacity-40 p-2">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- AntiForgery Token -->
+    <form id="antiForgeryForm" style="display:none;">
+        @Html.AntiForgeryToken()
+    </form>
+
+    <script>
+        var currentThreadId = null;
+
+        $(document).ready(function () {
+            loadUserProfile();
+            loadThreads();
+            loadQuota();
+
+            $('#questionInput').keypress(function (e) {
+                if (e.which == 13) {
+                    e.preventDefault();
+                    sendMessage();
+                }
+            });
+        });
+
+        // Load User Profile
+function loadUserProfile() {
+    $.ajax({
+        url: '@Url.Action("GetUserProfile", "Chat")',
+        type: 'GET',
+        success: function(response) {
+            if (response.success) {
+                $('#usernameDisplay').text(response.username);
+                $('#userInitial').text(response.username.charAt(0).toUpperCase());
+            }
+        }
+    });
+}
+        // Load Quota Info
+        function loadQuota() {
+            $.ajax({
+                url: '@Url.Action("GetUserQuota", "Chat")',
+                type: 'GET',
+                success: function (response) {
+                    if (response.success) {
+                        updateQuotaDisplay(response.remaining, response.percentage);
+                    }
+                }
+            });
+        }
+
+        function updateQuotaDisplay(remaining, percentage) {
+            $('#quotaText').text(remaining + ' questions left');
+            $('#quotaBar').css('width', percentage + '%');
+
+            if (percentage <= 15) {
+                $('#quotaBar').css('background', '#ef4444');
+            } else if (percentage <= 40) {
+                $('#quotaBar').css('background', '#f59e0b');
+            } else {
+                $('#quotaBar').css('background', '#00a884');
+            }
+        }
+
+        // Load Chat Threads from History
+        function loadThreads() {
+            $.ajax({
+                url: '@Url.Action("GetHistory", "Chat")',
+                type: 'GET',
+                success: function (response) {
+                    var html = '';
+                    if (response.success && response.data && response.data.length > 0) {
+                        response.data.forEach(function (item, index) {
+                            // Pehla thread active
+                            if (index === 0 && !currentThreadId) {
+                                currentThreadId = item.id;
+                            }
+                            html += `
+                                <div onclick="openThread(${item.id})"
+                                     class="flex items-center gap-3 px-4 py-3 hover:bg-[#202c33] cursor-pointer border-b border-[#222d34] transition ${currentThreadId === item.id ? 'bg-[#2a3942]' : ''}"
+                                     id="thread-${item.id}">
+                                    <div class="w-12 h-12 rounded-full bg-[#2a3942] flex items-center justify-center flex-shrink-0">
+                                        <span class="text-[#8696a0] text-lg">💬</span>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="text-[#e9edef] text-sm truncate">${item.question}</div>
+                                        <div class="text-[#8696a0] text-xs mt-0.5">Tap to view conversation</div>
+                                    </div>
+                                    <button onclick="deleteThread(event, ${item.id})"
+                                            class="text-[#8696a0] hover:text-red-400 transition text-lg">
+                                        ×
+                                    </button>
+                                </div>`;
+                        });
+                    } else {
+                        html = '<p class="text-[#8696a0] text-sm text-center mt-8">No conversations yet</p>';
+                    }
+                    $('#historyList').html(html);
+                },
+                error: function () {
+                    $('#historyList').html('<p class="text-red-400 text-sm text-center mt-8">Error loading</p>');
+                }
+            });
+        }
+
+        // Open a Chat Thread
+        function openThread(chatId) {
+            currentThreadId = chatId;
+
+            // Highlight active thread
+            $('[id^="thread-"]').removeClass('bg-[#2a3942]');
+            $('#thread-' + chatId).addClass('bg-[#2a3942]');
+
+            $.ajax({
+                url: '@Url.Action("GetChatMessages", "Chat")',
+                type: 'GET',
+                data: { chatId: chatId },
+                success: function (response) {
+                    if (response.success) {
+                        $('#chatMessages').empty();
+                        addMessage(response.question, 'user', '12:00 PM');
+                        addMessage(response.answer, 'bot', '12:01 PM');
+                        scrollToBottom();
+                    }
+                }
+            });
+        }
+
+        // Delete Thread
+        function deleteThread(event, chatId) {
+            event.stopPropagation();
+            if (!confirm('Delete this conversation?')) return;
+
+            var token = $('#antiForgeryForm input').val();
+
+            $.ajax({
+                url: '@Url.Action("DeleteChat", "Chat")',
+                type: 'POST',
+                data: { chatId: chatId, __RequestVerificationToken: token },
+                success: function (response) {
+                    if (response.success) {
+                        if (currentThreadId === chatId) {
+                            currentThreadId = null;
+                            newChat();
+                        }
+                        loadThreads();
+                        loadQuota();
+                    }
+                }
+            });
+        }
+
+        // New Chat
+        function newChat() {
+            currentThreadId = null;
+            $('[id^="thread-"]').removeClass('bg-[#2a3942]');
+            $('#chatMessages').html(`
+                <div class="flex flex-col items-center justify-center h-full text-center px-6" style="min-height: calc(100vh - 120px);">
+                    <div class="w-20 h-20 rounded-full bg-[#202c33] flex items-center justify-center mb-6">
+                        <span class="text-4xl">🤖</span>
+                    </div>
+                    <h1 class="text-[#e9edef] text-2xl font-light mb-3">AI Assistant</h1>
+                    <p class="text-[#8696a0] max-w-md text-sm">
+                        Ask me anything! Capitals, science, history, geography - I'm here to help.
+                    </p>
+                </div>`);
+        }
+
+        // Quick Ask from suggestion
+        function quickAsk(question) {
+            $('#questionInput').val(question);
+            sendMessage();
+        }
+
+        // Send Message
+        function sendMessage() {
+            var question = $('#questionInput').val().trim();
+            if (!question) return;
+
+            // User message show - RIGHT SIDE
+            addMessage(question, 'user', getCurrentTime());
+            $('#questionInput').val('');
+            $('#sendBtn').prop('disabled', true);
+
+            // Typing indicator
+            var typingId = 'typing-' + Date.now();
+            $('#chatMessages').append(`
+                <div class="message-row bot" id="${typingId}">
+                    <div class="message-bubble">
+                        <div class="typing-indicator">
+                            <span></span><span></span><span></span>
+                        </div>
+                    </div>
+                </div>`);
+            scrollToBottom();
+
+            var token = $('#antiForgeryForm input').val();
+
+            $.ajax({
+                url: '@Url.Action("Ask", "Chat")',
+                type: 'POST',
+                data: { question: question, __RequestVerificationToken: token },
+                success: function (response) {
+                    $('#' + typingId).remove();
+
+                    if (response.success) {
+                        // Bot answer - LEFT SIDE
+                        addMessage(response.answer, 'bot', getCurrentTime());
+                        updateQuotaDisplay(response.remaining, response.percentage);
+                    } else {
+                        addMessage(response.error || 'Error occurred', 'error');
+                    }
+                    loadThreads();
+                    loadQuota();
+                },
+                error: function () {
+                    $('#' + typingId).remove();
+                    addMessage('Network error. Please try again.', 'error');
+                },
+                complete: function () {
+                    $('#sendBtn').prop('disabled', false);
+                    $('#questionInput').focus();
+                }
+            });
+        }
+
+        // Add Message to Chat
+        function addMessage(text, role, time) {
+            // Remove welcome screen
+            $('.flex.flex-col.items-center.justify-center').remove();
+
+            var rowClass = '';
+            if (role === 'user') rowClass = 'user';
+            else if (role === 'bot') rowClass = 'bot';
+            else rowClass = 'error';
+
+            var msgHtml = `
+                <div class="message-row ${rowClass}">
+                    <div class="message-bubble">
+                        <div>${text}</div>
+                        ${time ? '<div class="message-time">' + time + '</div>' : ''}
+                    </div>
+                </div>`;
+
+            $('#chatMessages').append(msgHtml);
+            scrollToBottom();
+        }
+
+        function getCurrentTime() {
+            var now = new Date();
+            var hours = now.getHours();
+            var minutes = now.getMinutes();
+            var ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12 || 12;
+            minutes = minutes < 10 ? '0' + minutes : minutes;
+            return hours + ':' + minutes + ' ' + ampm;
+        }
+
+        function scrollToBottom() {
+            var chatDiv = document.getElementById('chatMessages');
+            chatDiv.scrollTop = chatDiv.scrollHeight;
+        }
+    </script>
+</body>
+</html>
